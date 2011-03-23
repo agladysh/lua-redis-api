@@ -1,0 +1,20 @@
+TODO:
+-----
+
+ -- Document current API.
+ -- Fix file headers.
+ -- Write better tests.
+
+ -- Do not forget to include this function in samples to generate
+    Redis protocol data:
+
+    local R = function(...)
+      local nargs = select("#", ...)
+      io.write("*", nargs, "\r\n")
+
+      for i = 1, nargs do
+        local arg = tostring(select(i, ...))
+        io.write("$", #arg, "\r\n")
+        io.write(arg, "\r\n")
+      end
+    end
