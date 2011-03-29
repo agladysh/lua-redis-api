@@ -113,7 +113,60 @@ do
 
   local data_str = assert(io.open("commands.json", "r")):read("*a")
   local data = assert(json.decode(data_str))
+
+  local override = { }
+
+  override.ZUNIONSTORE = tclone(assert_is_table(data.ZUNIONSTORE))
+  override.ZUNIONSTORE.arguments =
+  {
+    -- TODO
+  }
+
+  override.SORT = tclone(assert_is_table(data.SORT))
+  override.SORT.arguments =
+  {
+    -- TODO
+  }
+
+  override.ZINTERSTORE = tclone(assert_is_table(data.ZINTERSTORE))
+  override.ZINTERSTORE.arguments =
+  {
+    -- TODO
+  }
+
+  override.SUBSCRIBE = tclone(assert_is_table(data.SUBSCRIBE))
+  override.SUBSCRIBE.arguments =
+  {
+    -- TODO
+  }
+
+  override.HMSET = tclone(assert_is_table(data.HMSET))
+  override.HMSET.arguments =
+  {
+    -- TODO
+  }
+
+  override.PSUBSCRIBE = tclone(assert_is_table(data.PSUBSCRIBE))
+  override.PSUBSCRIBE.arguments =
+  {
+    -- TODO
+  }
+
+  override.MSETNX = tclone(assert_is_table(data.MSETNX))
+  override.MSETNX.arguments =
+  {
+    -- TODO
+  }
+
+  override.MSET = tclone(assert_is_table(data.SET))
+  override.MSET.arguments =
+  {
+    -- TODO
+  }
+
   for name, info in pairs(data) do
+    info = override[name] or info
+
     local cmd = { }
 
     cmd.raw = info -- TODO: Remove
@@ -185,6 +238,12 @@ do
           -- TODO: Do not lose group info
           --       (for example, about paired optionals like in ZRANGEBYSCORE)
 
+          if arg.multiple then
+            print(
+                "grouped multiple in " .. name .. ":" .. tstr(cmd)
+              )
+          end
+
           assert_is_table(arg_info.type)
           assert(#arg_info.name > 0)
           assert(#arg_info.name == #arg_info.type)
@@ -215,17 +274,30 @@ local cat, concat = make_concatter()
 
 --------------------------------------------------------------------------------
 
+cat [[
+-- TODO: Store select() argument and use it for reconnection
+-- TODO: Allow user to specify password for auth (via on_connect hook)
+
+]]
+
 for i = 1, #COMMANDS do
   local cmd = COMMANDS[i]
-
+--[=[
+  cat (fill_curly_placeholders([[
+  { id = "${id}", cmd = "${name}" };
+]], cmd))
+--]=]
+-- [===[
   cat [[
 --------------------------------------------------------------------------------
--- ]] (cmd.name) [[
+-- ]] (
+    ("%s %" .. (80 - 3 - #cmd.name - 1).. "s"):format(
+        cmd.name, "(since " .. cmd.since .. ")"
+      )
+  ) [[
 
 --
 -- Group: ]] (cmd.group) [[
-
--- Since: ]] (cmd.since) [[
 
 --
 ]] (wrap(cmd.summary, 80 - 3, "-- ", "-- ")) [[
@@ -235,14 +307,14 @@ for i = 1, #COMMANDS do
 ]]
   if #cmd.arguments == 0 then
     cat [[
-local ]] (cmd.id) [[ = function(self)
+mt.]] (cmd.id) [[ = function(self)
   return self.command_(self.obj_, ]] (("%q"):format(cmd.name)) [[)
 end
 
 ]]
   else
     cat [[
-local ]] (cmd.id) [[ = function(
+mt.]] (cmd.id) [[ = function(
     self]]
     for i = 1, #cmd.arguments do
       local arg = cmd.arguments[i]
@@ -260,27 +332,34 @@ local ]] (cmd.id) [[ = function(
     cat [[
 
   )
-  local nargs = select("#", ...)
 ]]
     -- TODO: Try to make generated code to look less weird
-    if command.have_multiple then
+    if cmd.have_multiple then
+      if cmd.post_multiple_count > 0 then
+        cat [[
+  local nargs = select("#", ...)
+
+]]
+      end
+
       local had_multiple = false
       for i = 1, #cmd.arguments do
+        local arg = cmd.arguments[i]
         if arg.multiple then
           assert(not had_multiple)
           had_multiple = true
 
           cat [[
   for i = ]] (i) [[, nargs - ]] (cmd.post_multiple_count) [[ do
-    check_]] (arg.type) [[(self, ]] (
-        tostring(arg.optional)
-      ) [[, select(nargs - ]] (i) [[, ...))
+    check_]] (arg.type) (
+        arg.optional and "_optional" or ""
+      ) [[(self, select(nargs - ]] (i) [[, ...))
   end
 ]]
         elseif had_multiple then
           assert(not arg.optional)
           cat [[
-  check_]] (arg.type) [[(self, false, select(nargs - ]] (i) [[, ...))
+  check_]] (arg.type) [[(self, select(nargs - ]] (i) [[, ...))
 ]]
         end
       end
@@ -288,31 +367,31 @@ local ]] (cmd.id) [[ = function(
 
     cat [[
   return self.command_(
-      self.obj_
-]]
+      self.obj_]]
 
     for i = 1, #cmd.arguments do
       local arg = cmd.arguments[i]
       if arg.multiple then
         cat [[,
-      ...
-]]
+      ...]]
         break
       end
 
       -- TODO: This is wrong!
       cat [[,
-      check_]] (arg.type) [[(self, ]] (
-          tostring(arg.optional)
-        ) [[, ]] (arg.id) [[)]]
+      check_]] (arg.type) (
+          arg.optional and "_optional" or ""
+        ) [[(self, ]] (arg.id) [[)]]
     end
 
     cat [[
+
     )
 end
 
 ]]
   end
+--]===]
 end
 
 io.write(concat(), "\n")
