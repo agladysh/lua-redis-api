@@ -115,6 +115,7 @@ end
 local cat, concat = make_concatter()
 
 --------------------------------------------------------------------------------
+
 local ocat = cat
 local function cat(s)
   if type(s) ~= "string" then print(tstr(s)) end
